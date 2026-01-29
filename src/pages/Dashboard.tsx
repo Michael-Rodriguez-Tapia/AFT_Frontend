@@ -1,13 +1,15 @@
 // ============================================================
-// 🌱 Dashboard.tsx — CORREGIDO (KG/HA + SIN DUPLICADOS)
+// 🌱 Dashboard.tsx — FINAL CORREGIDO
 // ============================================================
 
 import { useAuth0 } from "@auth0/auth0-react";
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import api from "../services/api";
 import FieldMap from "../components/FieldMap";
 import CollapsibleAnalyticsPanel from "../components/CollapsibleAnalyticsPanel";
-import { Calendar } from "lucide-react";
+import { Calendar, MapPin, LogOut, TrendingUp, User, Users } from "lucide-react";
+import { useUserRole } from "../hooks/useUserRole";
 
 function getDatesFromHarvestName(harvestName: string | null) {
   if (!harvestName) return { start: undefined, end: undefined };
@@ -40,7 +42,7 @@ function getLastNDays(days: number) {
 // ✅ Calcular hectáreas aproximadas
 function computeAreaHectares(poly: any): number {
   if (!poly || !poly.coordinates || !poly.coordinates[0]) return 0;
-  
+ 
   try {
     const coords = poly.coordinates[0];
     let area = 0;
@@ -53,7 +55,7 @@ function computeAreaHectares(poly: any): number {
 
     area = Math.abs(area) / 2;
     const hectares = area * 111000 * 111000 * Math.cos((-33 * Math.PI) / 180) / 10000;
-    
+   
     return Math.round(hectares * 100) / 100;
   } catch (error) {
     return 0;
@@ -62,6 +64,7 @@ function computeAreaHectares(poly: any): number {
 
 export default function Dashboard() {
   const { user, getAccessTokenSilently, logout } = useAuth0();
+  const { isAdmin, userRole } = useUserRole();
 
   const [loading, setLoading] = useState(true);
   const [fields, setFields] = useState<any[]>([]);
@@ -86,23 +89,31 @@ export default function Dashboard() {
   const [order, setOrder] = useState<"desc" | "asc">("desc");
 
   // ============================================================
-  // LOAD FIELDS
+  // LOAD FIELDS - ✅ CORREGIDO: Array vacío
   // ============================================================
   useEffect(() => {
     const load = async () => {
       try {
+        // 🔍 DEBUG: Ver qué URL está usando
+        console.log("🔍 VITE_API_URL:", import.meta.env.VITE_API_URL);
+        console.log("🔍 api.defaults.baseURL:", api.defaults.baseURL);
+        console.log("🔍 URL completa que se va a llamar:", `${api.defaults.baseURL}/fields`);
+        
         const token = await getAccessTokenSilently();
         const res = await api.get("/fields", {
           headers: { Authorization: `Bearer ${token}` },
         });
+        
+        console.log("✅ Fields response:", res.data);
         setFields(res.data);
+      } catch (error) {
+        console.error("❌ Error cargando fields:", error);
       } finally {
         setLoading(false);
       }
     };
     load();
   }, []);
-
   // ============================================================
   // LOAD FIELD
   // ============================================================
@@ -132,7 +143,7 @@ export default function Dashboard() {
       const harvestList = (h.data.data ?? []).sort((a: string, b: string) =>
         a.localeCompare(b, 'es', { sensitivity: 'base' })
       );
-      
+     
       const speciesListSorted = (s.data.data ?? []).sort((a: string, b: string) =>
         a.localeCompare(b, 'es', { sensitivity: 'base' })
       );
@@ -167,26 +178,26 @@ export default function Dashboard() {
         const token = await getAccessTokenSilently();
         const res = await api.get(`/analytics/harvests/summary`, {
           headers: { Authorization: `Bearer ${token}` },
-          params: { 
+          params: {
             fieldId: selectedField.id,
             harvestName: selectedHarvest,
             specie: selectedSpecies,
           }
         });
-        
+       
         if (res.data?.data) {
           const varieties: string[] = [...new Set(
             res.data.data
               .map((r: any) => r.variety)
               .filter((v: string) => v && v !== "Sin Variedad")
           )] as string[];
-          
+         
           const varietiesSorted = varieties.sort((a, b) =>
             a.localeCompare(b, 'es', { sensitivity: 'base' })
           );
-          
+         
           setVarietiesList(varietiesSorted);
-          
+         
           if (varietiesSorted.length > 0 && !selectedVariety) {
             setSelectedVariety(varietiesSorted[0]);
           }
@@ -216,8 +227,8 @@ export default function Dashboard() {
           `/analytics/field/${selectedField.name}/sectors/production`,
           {
             headers: { Authorization: `Bearer ${token}` },
-            params: { 
-              harvest: selectedHarvest, 
+            params: {
+              harvest: selectedHarvest,
               species: selectedSpecies || undefined
             },
           }
@@ -239,15 +250,15 @@ export default function Dashboard() {
     if (dateMode === "custom") {
       return { start: customStartDate, end: customEndDate };
     }
-    
+   
     if (dateMode === "20days") {
       return getLastNDays(20);
     }
-    
+   
     if (dateMode === "30days") {
       return getLastNDays(30);
     }
-    
+   
     return getDatesFromHarvestName(selectedHarvest);
   }, [dateMode, customStartDate, customEndDate, selectedHarvest]);
 
@@ -255,29 +266,27 @@ export default function Dashboard() {
   // ✅ SECTORES ORDENADOS POR KG/HA (NO TOTAL)
   // ============================================================
   const orderedSectors = useMemo(() => {
-    // Primero calcular kg/ha para cada sector
     const sectorsWithKgPerHa = sectorProduction.map(s => {
       const sector = selectedField?.sectors?.find(
         (sec: any) => sec.name.toLowerCase() === s.sector.toLowerCase()
       );
-      
+     
       const hectares = sector ? computeAreaHectares(sector.polygon) : 0;
       const kgPerHa = hectares > 0 ? Number(s.kg_total) / hectares : 0;
-      
+     
       return {
         ...s,
         hectares,
         kg_per_ha: Math.round(kgPerHa)
       };
     });
-    
-    // Ordenar por kg/ha
+   
     const sorted = [...sectorsWithKgPerHa].sort((a, b) =>
       order === "desc"
         ? b.kg_per_ha - a.kg_per_ha
         : a.kg_per_ha - b.kg_per_ha
     );
-    
+   
     return sorted.slice(0, topN);
   }, [sectorProduction, selectedField?.sectors, topN, order]);
 
@@ -291,12 +300,11 @@ export default function Dashboard() {
   // ============================================================
   const mappedField = useMemo(() => {
     if (!selectedField || !selectedField.sectors) return null;
-    
-    // ✅ Filtrar sectores únicos por nombre (evitar duplicados)
+   
     const uniqueSectors = selectedField.sectors.filter((s: any, index: number, self: any[]) => {
       return s.polygon && index === self.findIndex((t: any) => t.name.toLowerCase() === s.name.toLowerCase());
     });
-    
+   
     return {
       ...selectedField,
       sectors: uniqueSectors.map((s: any) => {
@@ -328,22 +336,98 @@ export default function Dashboard() {
   // RENDER
   // ============================================================
   return (
-    <section className="section">
+    <section style={{ backgroundColor: '#f5f7fa', minHeight: '100vh', padding: '2rem 0' }}>
       <div className="container">
-        {/* HEADER */}
-        <div className="box has-background-info-light">
-          <h1 className="title is-3">📊 Gestión Agrícola</h1>
-          <p className="subtitle is-6">
-            Usuario: <strong>{user?.email}</strong>
-          </p>
+        {/* HEADER GRIS SIMPLE */}
+        <div
+          className="box"
+          style={{
+            backgroundColor: '#64748b',
+            border: 'none',
+            marginBottom: '2rem',
+            padding: '1.5rem 2rem'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <div>
+              <h1 className="title is-3" style={{ color: '#ffffff', marginBottom: '0.5rem', fontWeight: 700 }}>
+                🌱 AFT Gestión Agrícola
+              </h1>
+              <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <User size={16} />
+                {user?.email} • <span className="tag is-light is-small">{userRole}</span>
+              </p>
+            </div>
+            <button
+              className="button"
+              onClick={() =>
+                logout({
+                  logoutParams: {
+                    returnTo: window.location.origin,
+                  },
+                })
+              }
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.2)',
+                color: '#ffffff',
+                border: '1px solid rgba(255,255,255,0.3)',
+              }}
+            >
+              <span className="icon">
+                <LogOut size={18} />
+              </span>
+              <span>Cerrar sesión</span>
+            </button>
+          </div>
+
+          {/* NAVEGACIÓN */}
+          <div style={{ display: 'flex', gap: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '1rem' }}>
+            <Link
+              to="/dashboard"
+              style={{
+                color: '#ffffff',
+                padding: '0.5rem 1rem',
+                borderRadius: '6px',
+                backgroundColor: 'rgba(255,255,255,0.15)',
+                textDecoration: 'none',
+                fontSize: '0.9rem',
+                fontWeight: 500
+              }}
+            >
+              Dashboard
+            </Link>
+
+            {isAdmin && (
+              <Link
+                to="/usuarios"
+                style={{
+                  color: '#ffffff',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '6px',
+                  backgroundColor: 'rgba(139, 92, 246, 0.3)',
+                  textDecoration: 'none',
+                  fontSize: '0.9rem',
+                  fontWeight: 500,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                <Users size={16} /> Usuarios
+              </Link>
+            )}
+          </div>
         </div>
 
         {loading && <progress className="progress is-primary" max="100" />}
 
-        {/* SELECT FIELD */}
-        <div className="box">
-          <label className="label">Campo</label>
-          <div className="select is-fullwidth">
+        {/* SELECT FIELD - BLANCO CON TEXTO NEGRO */}
+        <div className="box" style={{ backgroundColor: '#ffffff' }}>
+          <label className="label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#1e293b' }}>
+            <MapPin size={18} />
+            Seleccionar Campo
+          </label>
+          <div className="select is-fullwidth is-medium">
             <select
               value={selectedField?.id ?? ""}
               onChange={async (e) => {
@@ -355,10 +439,15 @@ export default function Dashboard() {
                   await loadFilters(f.name);
                 }
               }}
+              style={{
+                backgroundColor: '#ffffff',
+                color: '#1e293b',
+                fontWeight: 500
+              }}
             >
-              <option value="">-- Selecciona campo --</option>
+              <option value="" style={{ color: '#64748b' }}>-- Selecciona un campo --</option>
               {fields.map((f) => (
-                <option key={f.id} value={f.id}>
+                <option key={f.id} value={f.id} style={{ color: '#1e293b' }}>
                   {f.name}
                 </option>
               ))}
@@ -366,12 +455,13 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* FILTERS */}
+        {/* FILTERS - BLANCOS CON TEXTO NEGRO */}
         {selectedField && (
-          <div className="box">
+          <div className="box" style={{ backgroundColor: '#ffffff' }}>
+            <h3 className="title is-5" style={{ marginBottom: '1.5rem', color: '#1e293b' }}>Filtros de Análisis</h3>
             <div className="columns">
               <div className="column">
-                <label className="label">Cosecha</label>
+                <label className="label" style={{ color: '#1e293b' }}>Cosecha</label>
                 <div className="select is-fullwidth">
                   <select
                     value={selectedHarvest ?? ""}
@@ -379,9 +469,10 @@ export default function Dashboard() {
                       setSelectedHarvest(e.target.value || null);
                       setSelectedVariety(null);
                     }}
+                    style={{ backgroundColor: '#ffffff', color: '#1e293b' }}
                   >
                     {harvests.map((h) => (
-                      <option key={h} value={h}>
+                      <option key={h} value={h} style={{ color: '#1e293b' }}>
                         {h}
                       </option>
                     ))}
@@ -390,7 +481,7 @@ export default function Dashboard() {
               </div>
 
               <div className="column">
-                <label className="label">Especie</label>
+                <label className="label" style={{ color: '#1e293b' }}>Especie</label>
                 <div className="select is-fullwidth">
                   <select
                     value={selectedSpecies ?? ""}
@@ -398,9 +489,10 @@ export default function Dashboard() {
                       setSelectedSpecies(e.target.value || null);
                       setSelectedVariety(null);
                     }}
+                    style={{ backgroundColor: '#ffffff', color: '#1e293b' }}
                   >
                     {speciesList.map((s) => (
-                      <option key={s} value={s}>
+                      <option key={s} value={s} style={{ color: '#1e293b' }}>
                         {s}
                       </option>
                     ))}
@@ -409,7 +501,7 @@ export default function Dashboard() {
               </div>
 
               <div className="column">
-                <label className="label">Variedad</label>
+                <label className="label" style={{ color: '#1e293b' }}>Variedad</label>
                 <div className="select is-fullwidth">
                   <select
                     value={selectedVariety ?? ""}
@@ -417,10 +509,11 @@ export default function Dashboard() {
                       setSelectedVariety(e.target.value || null)
                     }
                     disabled={varietiesList.length === 0}
+                    style={{ backgroundColor: '#ffffff', color: '#1e293b' }}
                   >
-                    <option value="">Todas</option>
+                    <option value="" style={{ color: '#64748b' }}>Todas</option>
                     {varietiesList.map((v) => (
-                      <option key={v} value={v}>
+                      <option key={v} value={v} style={{ color: '#1e293b' }}>
                         {v}
                       </option>
                     ))}
@@ -429,71 +522,76 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="field is-grouped" style={{ marginTop: '1rem' }}>
-              <p className="control">
-                <button
-                  className={`button ${dateMode === "20days" ? "is-info" : "is-light"}`}
-                  onClick={() => setDateMode("20days")}
-                >
-                  Últimos 20 días
-                </button>
-              </p>
-              <p className="control">
-                <button
-                  className={`button ${dateMode === "30days" ? "is-info" : "is-light"}`}
-                  onClick={() => setDateMode("30days")}
-                >
-                  Últimos 30 días
-                </button>
-              </p>
-              <p className="control">
-                <button
-                  className={`button ${dateMode === "harvest" ? "is-info" : "is-light"}`}
-                  onClick={() => setDateMode("harvest")}
-                >
-                  Rango de cosecha
-                </button>
-              </p>
-              <p className="control">
-                <button
-                  className={`button ${dateMode === "custom" ? "is-info" : "is-light"}`}
-                  onClick={() => {
-                    setDateMode("custom");
-                    setShowDatePickers(!showDatePickers);
-                  }}
-                >
-                  <span className="icon">
-                    <Calendar size={18} />
-                  </span>
-                  <span>Personalizar</span>
-                </button>
-              </p>
-            </div>
+            <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '1.5rem', marginTop: '1rem' }}>
+              <label className="label" style={{ marginBottom: '0.75rem', color: '#1e293b' }}>Período de Análisis</label>
+              <div className="field is-grouped">
+                <p className="control">
+                  <button
+                    className={`button ${dateMode === "20days" ? "is-info" : "is-light"}`}
+                    onClick={() => setDateMode("20days")}
+                  >
+                    Últimos 20 días
+                  </button>
+                </p>
+                <p className="control">
+                  <button
+                    className={`button ${dateMode === "30days" ? "is-info" : "is-light"}`}
+                    onClick={() => setDateMode("30days")}
+                  >
+                    Últimos 30 días
+                  </button>
+                </p>
+                <p className="control">
+                  <button
+                    className={`button ${dateMode === "harvest" ? "is-info" : "is-light"}`}
+                    onClick={() => setDateMode("harvest")}
+                  >
+                    Rango de cosecha
+                  </button>
+                </p>
+                <p className="control">
+                  <button
+                    className={`button ${dateMode === "custom" ? "is-info" : "is-light"}`}
+                    onClick={() => {
+                      setDateMode("custom");
+                      setShowDatePickers(!showDatePickers);
+                    }}
+                  >
+                    <span className="icon">
+                      <Calendar size={18} />
+                    </span>
+                    <span>Personalizar</span>
+                  </button>
+                </p>
+              </div>
 
-            {showDatePickers && dateMode === "custom" && (
-              <div className="box" style={{ marginTop: '1rem', backgroundColor: '#f8f9fa' }}>
-                <div className="columns">
-                  <div className="column">
-                    <label className="label is-small">Fecha Inicio</label>
-                    <input
-                      type="date"
-                      className="input"
-                      value={customStartDate}
-                      onChange={(e) => setCustomStartDate(e.target.value)}
-                    />
-                  </div>
-                  <div className="column">
-                    <label className="label is-small">Fecha Fin</label>
-                    <input
-                      type="date"
-                      className="input"
-                      value={customEndDate}
-                      onChange={(e) => setCustomEndDate(e.target.value)}
-                    />
+              {showDatePickers && dateMode === "custom" && (
+                <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
+                  <div className="columns">
+                    <div className="column">
+                      <label className="label is-small" style={{ color: '#1e293b' }}>Fecha Inicio</label>
+                      <input
+                        type="date"
+                        className="input"
+                        value={customStartDate}
+                        onChange={(e) => setCustomStartDate(e.target.value)}
+                        style={{ backgroundColor: '#ffffff', color: '#1e293b' }}
+                      />
+                    </div>
+                    <div className="column">
+                      <label className="label is-small" style={{ color: '#1e293b' }}>Fecha Fin</label>
+                      <input
+                        type="date"
+                        className="input"
+                        value={customEndDate}
+                        onChange={(e) => setCustomEndDate(e.target.value)}
+                        style={{ backgroundColor: '#ffffff', color: '#1e293b' }}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         )}
 
@@ -501,9 +599,13 @@ export default function Dashboard() {
         {mappedField && mappedField.sectors.length > 0 && selectedHarvest && (
           <div className="columns">
             <div className="column is-7">
-              <div className="box">
-                <FieldMap 
-                  field={mappedField} 
+              <div className="box" style={{ backgroundColor: '#ffffff' }}>
+                <h3 className="title is-5" style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#1e293b' }}>
+                  <MapPin size={20} />
+                  Mapa del Campo
+                </h3>
+                <FieldMap
+                  field={mappedField}
                   height="450px"
                   filters={{
                     harvest: selectedHarvest,
@@ -515,12 +617,15 @@ export default function Dashboard() {
             </div>
 
             <div className="column is-5">
-              <div className="box">
-                <h3 className="title is-5 mb-3">Comparación de Sectores (kg/ha)</h3>
+              <div className="box" style={{ backgroundColor: '#ffffff' }}>
+                <h3 className="title is-5" style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#1e293b' }}>
+                  <TrendingUp size={20} />
+                  Ranking de Sectores (kg/ha)
+                </h3>
 
                 <div className="columns is-mobile mb-3">
                   <div className="column">
-                    <label className="label is-small">Top</label>
+                    <label className="label is-small" style={{ color: '#1e293b' }}>Mostrar Top</label>
                     <input
                       type="number"
                       min={1}
@@ -528,20 +633,22 @@ export default function Dashboard() {
                       className="input"
                       value={topN}
                       onChange={(e) => setTopN(Number(e.target.value))}
+                      style={{ backgroundColor: '#ffffff', color: '#1e293b' }}
                     />
                   </div>
 
                   <div className="column">
-                    <label className="label is-small">Orden</label>
+                    <label className="label is-small" style={{ color: '#1e293b' }}>Ordenar por</label>
                     <div className="select is-fullwidth">
                       <select
                         value={order}
                         onChange={(e) =>
                           setOrder(e.target.value as "asc" | "desc")
                         }
+                        style={{ backgroundColor: '#ffffff', color: '#1e293b' }}
                       >
-                        <option value="desc">Mayor → Menor</option>
-                        <option value="asc">Menor → Mayor</option>
+                        <option value="desc" style={{ color: '#1e293b' }}>Mayor → Menor</option>
+                        <option value="asc" style={{ color: '#1e293b' }}>Menor → Mayor</option>
                       </select>
                     </div>
                   </div>
@@ -552,34 +659,55 @@ export default function Dashboard() {
                     No hay datos de producción para los filtros seleccionados
                   </div>
                 ) : (
-                  orderedSectors.map((s) => {
-                    const pct = (s.kg_per_ha / maxKgPerHa) * 100;
-                    const active = selectedSector?.name === s.sector;
+                  <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                    {orderedSectors.map((s, index) => {
+                      const pct = (s.kg_per_ha / maxKgPerHa) * 100;
+                      const active = selectedSector?.name === s.sector;
 
-                    return (
-                      <div
-                        key={s.sector}
-                        className={`box mb-2 ${
-                          active ? "has-background-info-light" : ""
-                        }`}
-                        style={{ cursor: "pointer" }}
-                        onClick={() => setSelectedSector({ name: s.sector })}
-                      >
-                        <div className="is-flex is-justify-content-space-between">
-                          <strong>{s.sector}</strong>
-                          <span>{s.kg_per_ha.toLocaleString()} kg/ha</span>
+                      return (
+                        <div
+                          key={s.sector}
+                          className="box"
+                          style={{
+                            cursor: "pointer",
+                            marginBottom: '0.75rem',
+                            backgroundColor: active ? '#eff6ff' : '#ffffff',
+                            border: active ? '2px solid #3b82f6' : '1px solid #e2e8f0',
+                            transition: 'all 0.2s ease',
+                          }}
+                          onClick={() => setSelectedSector({ name: s.sector })}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <span style={{
+                                backgroundColor: '#f1f5f9',
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '4px',
+                                fontSize: '0.75rem',
+                                fontWeight: '600',
+                                color: '#64748b'
+                              }}>
+                                #{index + 1}
+                              </span>
+                              <strong style={{ fontSize: '0.95rem', color: '#1e293b' }}>{s.sector}</strong>
+                            </div>
+                            <span style={{ fontWeight: '700', color: '#1a202c' }}>
+                              {s.kg_per_ha.toLocaleString()} kg/ha
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.5rem' }}>
+                            {s.hectares.toFixed(2)} ha · Total: {Number(s.kg_total).toLocaleString()} kg
+                          </div>
+                          <progress
+                            className="progress is-info"
+                            value={pct}
+                            max={100}
+                            style={{ height: '8px' }}
+                          />
                         </div>
-                        <div style={{ fontSize: 11, color: "#666", marginTop: 2 }}>
-                          {s.hectares.toFixed(2)} ha · Total: {Number(s.kg_total).toLocaleString()} kg
-                        </div>
-                        <progress
-                          className="progress is-info mt-2"
-                          value={pct}
-                          max={100}
-                        />
-                      </div>
-                    );
-                  })
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             </div>
@@ -600,20 +728,6 @@ export default function Dashboard() {
             }}
           />
         )}
-
-        {/* LOGOUT */}
-        <button
-          className="button is-danger mt-5"
-          onClick={() =>
-            logout({
-              logoutParams: {
-                returnTo: import.meta.env.VITE_AUTH0_LOGOUT_URL,
-              },
-            })
-          }
-        >
-          Cerrar sesión
-        </button>
       </div>
     </section>
   );

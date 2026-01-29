@@ -32,6 +32,36 @@ api.interceptors.request.use((config) => {
 
 export const AFT = {
   // ----------------------------------------------------------
+  // 👥 USERS (GESTIÓN DE USUARIOS)
+  // ----------------------------------------------------------
+  users: {
+    // Obtener todos los usuarios (solo admin/gerencia)
+    getAll: () =>
+      api.get(`/users`),
+
+    // Obtener usuario por ID
+    getById: (id: number) =>
+      api.get(`/users/${id}`),
+
+    // Crear usuario manualmente (solo admin)
+    create: (userData: {
+      auth0Id: string;
+      email: string;
+      name: string;
+      role?: 'campo' | 'gerencia' | 'admin' | 'pending';
+    }) =>
+      api.post(`/users`, userData),
+
+    // Actualizar rol de usuario (solo admin)
+    updateRole: (userId: number, role: 'campo' | 'gerencia' | 'admin' | 'pending') =>
+      api.patch(`/users/${userId}/role`, { role }),
+
+    // Eliminar usuario (solo admin)
+    delete: (userId: number) =>
+      api.delete(`/users/${userId}`),
+  },
+
+  // ----------------------------------------------------------
   // 🌾 HARVEST DELIVERIES
   // ----------------------------------------------------------
   harvestDeliveries: {
@@ -108,7 +138,7 @@ export const AFT = {
         params,
       }),
 
-    // 💰 Timeline pagos (ESTE FALTABA)
+    // 💰 Timeline pagos
     getHarvestSummaryPaymentsTimeline: (params: {
       fieldId: number;
       startDate?: string;
