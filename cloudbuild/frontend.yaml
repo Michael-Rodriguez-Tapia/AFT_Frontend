@@ -1,38 +1,45 @@
+substitutions:
+  _REGION: us-central1
+  _SERVICE: atf-frontend
+
 steps:
-  - name: gcr.io/cloud-builders/docker
+  - name: "gcr.io/cloud-builders/docker"
     args:
       - build
       - -t
-      - gcr.io/$PROJECT_ID/atf-frontend
+      - gcr.io/$PROJECT_ID/${_SERVICE}:$SHORT_SHA
       - --build-arg
-      - VITE_AUTH0_DOMAIN=dev-2c7hbbihiefpum6a.us.auth0.com
+      - VITE_AUTH0_DOMAIN=${_VITE_AUTH0_DOMAIN}
       - --build-arg
-      - VITE_AUTH0_CLIENT_ID=rk3uUebq6trvBQAHxT2LUNHARjNXe2fZ
+      - VITE_AUTH0_CLIENT_ID=${_VITE_AUTH0_CLIENT_ID}
       - --build-arg
-      - VITE_AUTH0_AUDIENCE=https://aft-gestion/api
+      - VITE_AUTH0_AUDIENCE=${_VITE_AUTH0_AUDIENCE}
       - --build-arg
-      - VITE_API_URL=https://atf-backend-316055435712.us-central1.run.app/api
+      - VITE_API_URL=${_VITE_API_URL}
       - --build-arg
-      - VITE_MAPBOX_TOKEN=pk.eyJ1IjoibWljaGFlbHJ0IiwiYSI6ImNtZ3V2dHk0czBnNzkyam9zcmM2MjlpcWYifQ.8wBT5b8zb0rxn4F5G9HpxQ
+      - VITE_MAPBOX_TOKEN=${_VITE_MAPBOX_TOKEN}
       - .
 
-  - name: gcr.io/cloud-builders/docker
+  - name: "gcr.io/cloud-builders/docker"
     args:
       - push
-      - gcr.io/$PROJECT_ID/atf-frontend
+      - gcr.io/$PROJECT_ID/${_SERVICE}:$SHORT_SHA
 
-  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
     entrypoint: gcloud
     args:
       - run
       - deploy
-      - atf-frontend
+      - ${_SERVICE}
       - --image
-      - gcr.io/$PROJECT_ID/atf-frontend
+      - gcr.io/$PROJECT_ID/${_SERVICE}:$SHORT_SHA
       - --region
-      - us-central1
+      - ${_REGION}
       - --platform
       - managed
       - --allow-unauthenticated
       - --port
       - "80"
+
+images:
+  - gcr.io/$PROJECT_ID/${_SERVICE}:$SHORT_SHA
