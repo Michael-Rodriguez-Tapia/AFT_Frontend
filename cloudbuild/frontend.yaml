@@ -3,49 +3,44 @@ substitutions:
   _SERVICE: atf-frontend
 
 steps:
-  # 1️⃣ Build imagen Docker (con variables Vite)
-  - name: "gcr.io/cloud-builders/docker"
+  - name: gcr.io/cloud-builders/docker
     args:
       - build
       - -t
       - gcr.io/$PROJECT_ID/${_SERVICE}:$SHORT_SHA
       - --build-arg
-      - VITE_AUTH0_DOMAIN=${_VITE_AUTH0_DOMAIN}
+      - VITE_AUTH0_DOMAIN=dev-2c7hbbihiefpum6a.us.auth0.com
       - --build-arg
-      - VITE_AUTH0_CLIENT_ID=${_VITE_AUTH0_CLIENT_ID}
+      - VITE_AUTH0_CLIENT_ID=rk3uUebq6trvBQAHxT2LUNHARjNXe2fZ
       - --build-arg
-      - VITE_AUTH0_AUDIENCE=${_VITE_AUTH0_AUDIENCE}
+      - VITE_AUTH0_AUDIENCE=https://aft-gestion/api
       - --build-arg
-      - VITE_API_URL=${_VITE_API_URL}
+      - VITE_API_URL=https://atf-backend-316055435712.us-central1.run.app/api
       - --build-arg
-      - VITE_MAPBOX_TOKEN=${_VITE_MAPBOX_TOKEN}
+      - VITE_MAPBOX_TOKEN=pk.eyJ1IjoibWljaGFlbHJ0IiwiYSI6ImNtZ3V2dHk0czBnNzkyam9zcmM2MjlpcWYifQ.8wBT5b8zb0rxn4F5G9HpxQ
       - .
 
-  # 2️⃣ Push a Container Registry
-  - name: "gcr.io/cloud-builders/docker"
+  - name: gcr.io/cloud-builders/docker
     args:
       - push
       - gcr.io/$PROJECT_ID/${_SERVICE}:$SHORT_SHA
 
-  # 3️⃣ Deploy a Cloud Run
-  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: gcloud
     args:
       - run
       - deploy
-      - ${_SERVICE}
+      - atf-frontend
       - --image
-      - gcr.io/$PROJECT_ID/${_SERVICE}:$SHORT_SHA
+      - gcr.io/$PROJECT_ID/atf-frontend:$SHORT_SHA
       - --region
-      - ${_REGION}
+      - us-central1
       - --platform
       - managed
       - --allow-unauthenticated
-      - --port
-      - "80"
 
 images:
-  - gcr.io/$PROJECT_ID/${_SERVICE}:$SHORT_SHA
+  - gcr.io/$PROJECT_ID/atf-frontend:$SHORT_SHA
 
 options:
   logging: CLOUD_LOGGING_ONLY
