@@ -3,6 +3,7 @@ substitutions:
   _SERVICE: atf-frontend
 
 steps:
+  # 1️⃣ Build imagen Docker (con variables Vite)
   - name: "gcr.io/cloud-builders/docker"
     args:
       - build
@@ -20,11 +21,13 @@ steps:
       - VITE_MAPBOX_TOKEN=${_VITE_MAPBOX_TOKEN}
       - .
 
+  # 2️⃣ Push a Container Registry
   - name: "gcr.io/cloud-builders/docker"
     args:
       - push
       - gcr.io/$PROJECT_ID/${_SERVICE}:$SHORT_SHA
 
+  # 3️⃣ Deploy a Cloud Run
   - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
     entrypoint: gcloud
     args:
@@ -43,3 +46,6 @@ steps:
 
 images:
   - gcr.io/$PROJECT_ID/${_SERVICE}:$SHORT_SHA
+
+options:
+  logging: CLOUD_LOGGING_ONLY
